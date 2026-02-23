@@ -1,0 +1,1492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NSM Interactive Map</title>
+    <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: row;
+            height: 100vh;
+            background: rgba(255, 255, 255, 0.95);
+            margin: 2px;
+            border-radius: 5px;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+            position: relative;
+        }
+
+        .sidebar {
+            width: 350px;
+            min-width: 350px;
+            max-width: 350px;
+            background: linear-gradient(180deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 20px;
+            overflow-y: auto;
+            box-shadow: 5px 0 15px rgba(0, 0, 0, 0.1);
+            display: block;
+        }
+
+        #map {
+            flex: 1;
+            min-width: 300px;
+            position: relative;
+            display: block;
+        }
+
+        .right-sidebar {
+            width: 200px;
+            min-width: 200px;
+            max-width: 200px;
+            background: linear-gradient(180deg, #34495e 0%, #2c3e50 100%);
+            color: white;
+            padding: 15px;
+            overflow-y: auto;
+            box-shadow: -5px 0 15px rgba(0, 0, 0, 0.1);
+            display: block;
+        }
+
+        .sidebar h1 {
+            font-size: 24px;
+            margin-bottom: 20px;
+            color: #ecf0f1;
+            text-align: center;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+
+        .right-sidebar h1 {
+            font-size: 18px;
+            margin-bottom: 15px;
+            color: #ecf0f1;
+            text-align: center;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 8px;
+        }
+
+        .data-config {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .data-config h3 {
+            color: #3498db;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        .address-search {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .address-search h3 {
+            color: #3498db;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #3498db;
+            border-radius: 5px;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        .search-btn {
+            width: 100%;
+            padding: 10px;
+            background: linear-gradient(45deg, #e74c3c, #c0392b);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .search-btn:hover {
+            background: linear-gradient(45deg, #c0392b, #a93226);
+        }
+
+        .search-btn:disabled {
+            background: #7f8c8d;
+            cursor: not-allowed;
+        }
+
+        .congregation-list {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            height: calc(100vh - 270px);
+            overflow-y: auto;
+        }
+
+        .congregation-list h3 {
+            color: #3498db;
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+
+        .congregation-item {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 12px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-left: 4px solid transparent;
+        }
+
+        .congregation-item:hover {
+            background: rgba(52, 152, 219, 0.2);
+            border-left-color: #3498db;
+            transform: translateX(5px);
+        }
+
+        .congregation-item.active {
+            background: rgba(52, 152, 219, 0.3);
+            border-left-color: #3498db;
+        }
+
+        .congregation-name {
+            font-weight: bold;
+            color: #ecf0f1;
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+
+        .congregation-distance {
+            color: #3498db;
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 3px;
+        }
+
+        .congregation-address {
+            color: #bdc3c7;
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+
+        .congregation-resources {
+            font-size: 11px;
+        }
+
+        .resource-tag {
+            display: inline-block;
+            background: rgba(46, 204, 113, 0.8);
+            color: white;
+            padding: 2px 6px;
+            border-radius: 10px;
+            margin: 1px;
+            font-size: 10px;
+        }
+
+        .right-sidebar .stats {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        .right-sidebar .stats-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #3498db;
+            display: block;
+        }
+
+        .right-sidebar .stats-label {
+            font-size: 12px;
+            color: #ecf0f1;
+            margin-top: 3px;
+        }
+
+        .right-sidebar .filter-section {
+            margin-bottom: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 12px;
+            border-radius: 8px;
+        }
+
+        .right-sidebar .filter-section h3 {
+            color: #3498db;
+            margin-bottom: 12px;
+            font-size: 14px;
+        }
+
+        /* Toggle Switch Styles */
+        .filter-switches {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .filter-switch-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 4px 0;
+        }
+
+        .filter-switch-label {
+            font-size: 12px;
+            color: #ecf0f1;
+            text-transform: capitalize;
+            flex: 1;
+            margin-right: 8px;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 40px;
+            height: 20px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(255, 255, 255, 0.2);
+            transition: .3s;
+            border-radius: 20px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 2px;
+            bottom: 2px;
+            background-color: white;
+            transition: .3s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #3498db;
+        }
+
+        input:focus + .slider {
+            box-shadow: 0 0 1px #3498db;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(20px);
+        }
+
+        .slider:hover {
+            background-color: rgba(52, 152, 219, 0.3);
+        }
+
+        input:checked + .slider:hover {
+            background-color: #2980b9;
+        }
+
+        .maplibregl-popup-content {
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .popup-content h3 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+
+        .popup-content p {
+            margin: 5px 0;
+            color: #34495e;
+            font-size: 14px;
+        }
+
+        .loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(44, 62, 80, 0.9);
+            color: white;
+            padding: 20px 40px;
+            border-radius: 10px;
+            font-size: 16px;
+            z-index: 10000;
+        }
+
+        .error-message {
+            background: #e74c3c;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+
+        .success-message {
+            background: #34495e;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+
+        .resources-container {
+            margin-top: 10px;
+        }
+
+        .service-tag {
+            display: inline-block;
+            padding: 5px 10px;
+            margin: 2px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 15px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .service-tag:hover {
+            background: #2980b9;
+        }
+
+        .service-tag.active {
+            background: #e74c3c;
+        }
+
+        .service-details {
+            display: none;
+            margin-top: 10px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            border-left: 4px solid #3498db;
+        }
+
+        .service-details.active {
+            display: block;
+        }
+
+        .service-details h4 {
+            color: #2c3e50;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .service-info {
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        /* Reset Button Styles */
+
+
+        .reset-filters-btn:hover {
+            background: linear-gradient(45deg, #c0392b, #a93226);
+            transform: translateY(-1px);
+        }
+
+        .reset-filters-btn:active {
+            transform: translateY(0);
+        }
+        .reset-filters-btn {
+            width: 100%;
+            padding: 8px 12px;
+            background: linear-gradient(45deg, #e74c3c, #c0392b);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 12px;
+            letter-spacing: 0.5px;
+        }
+
+        .reset-filters-btn:hover {
+            background: linear-gradient(45deg, #c0392b, #a93226);
+            transform: translateY(-1px);
+        }
+
+        .reset-filters-btn:active {
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <h1>Resources Map</h1>
+            
+            <div class="address-search">
+                <h3>🔍 Find Nearby Congregations</h3>
+                <input type="text" id="addressInput" class="search-input" placeholder="Enter your address (e.g., 1234 Main St, Philadelphia, PA)">
+                <button id="searchBtn" class="search-btn">Search Nearby</button>
+            </div>
+            
+            <div id="congregationList" class="congregation-list" style="display: none;">
+                <h3>📍 Congregations Near You</h3>
+                <div id="listingsContainer"></div>
+            </div>
+        </div>
+
+        <div id="map"></div>
+        
+        <div class="right-sidebar">
+            <h1>📊 Filter Map</h1>
+            
+            <div class="stats">
+                <span class="stats-number" id="recordCount">0</span>
+                <span class="stats-label">Records Found</span>
+            </div>
+
+            <div class="filter-section" id="filtersSection" style="display: none;">
+                <h3>🔍 Filters</h3>
+                <div id="dynamicFilters">
+                    <!-- Dynamic filter switches will be populated here -->
+                </div>
+            </div>
+
+            <div id="rightErrorMessages"></div>
+        </div>
+    </div>
+
+    <div id="loading" class="loading" style="display: none;">Loading data...</div>
+
+    <script>
+        // Global variables
+        let map;
+        let originalData = [];
+        let filteredData = [];
+        let userLocationMarker = null;
+        let userLocation = null;
+        let isInitialLoad = true;
+
+        // Function to calculate distance between two coordinates (in miles)
+        function calculateDistance(lat1, lng1, lat2, lng2) {
+            const R = 3959; // Earth's radius in miles
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLng = (lng2 - lng1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                    Math.sin(dLng/2) * Math.sin(dLng/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+
+        // Function to convert text to sentence case
+        function toSentenceCase(str) {
+            if (!str) return str;
+            return str.toLowerCase().replace(/\b\w/g, function(match) {
+                return match.toUpperCase();
+            });
+        }
+
+        // Initialize the map
+        function initMap() {
+            map = new maplibregl.Map({
+                container: 'map',
+                style: {
+                    'version': 8,
+                    'sources': {
+                        'osm': {
+                            'type': 'raster',
+                            'tiles': ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+                            'tileSize': 256,
+                            'attribution': '© OpenStreetMap contributors'
+                        }
+                    },
+                    'layers': [{
+                        'id': 'osm',
+                        'type': 'raster',
+                        'source': 'osm'
+                    }]
+                },
+                center: [-75.23238, 39.98570], // Philadelphia default
+                zoom: 11
+            });
+
+            map.on('load', () => {
+                setupMapInteractions();
+                setupAddressSearch();
+                // Automatically load data when map is ready
+                loadData();
+            });
+        }
+
+        // Setup address search functionality
+        function setupAddressSearch() {
+            const searchBtn = document.getElementById('searchBtn');
+            const addressInput = document.getElementById('addressInput');
+            
+            searchBtn.addEventListener('click', handleAddressSearch);
+            addressInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    handleAddressSearch();
+                }
+            });
+        }
+
+        // Handle address search
+        async function handleAddressSearch() {
+            const address = document.getElementById('addressInput').value.trim();
+            
+            if (!address) {
+                showError('Please enter an address');
+                return;
+            }
+
+            try {
+                showLoading('Searching for address...');
+                const coordinates = await geocodeAddress(address);
+                
+                if (coordinates) {
+                    userLocation = coordinates;
+                    addUserLocationMarker(coordinates);
+                    showNearbyConggregations(coordinates);
+                    
+                    // Fly to the user's location
+                    map.flyTo({
+                        center: [coordinates.lng, coordinates.lat],
+                        zoom: 12
+                    });
+                    
+                    showSuccess(`Found address: ${address}`);
+                } else {
+                    showError('Address not found in the Philadelphia area. Please try an address within 50 miles of Philadelphia.');
+                }
+            } catch (error) {
+                console.error('Geocoding error:', error);
+                showError('Error finding address. Please try again.');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // Geocode address using Nominatim (OpenStreetMap) - Limited to Philadelphia area
+        async function geocodeAddress(address) {
+            try {
+                // Philadelphia bounding box (approximately 50 miles radius)
+                // Southwest: 39.7, -75.8  Northeast: 40.3, -74.8
+                const boundingBox = '-75.8,39.7,-74.8,40.3'; // left,bottom,right,top
+                
+                const response = await fetch(
+                    `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1&bounded=1&viewbox=${boundingBox}&countrycodes=us`
+                );
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data && data.length > 0) {
+                    const result = {
+                        lat: parseFloat(data[0].lat),
+                        lng: parseFloat(data[0].lon),
+                        displayName: data[0].display_name
+                    };
+                    
+                    // Double-check that the result is within Philadelphia area
+                    if (result.lat >= 39.7 && result.lat <= 40.3 && 
+                        result.lng >= -75.8 && result.lng <= -74.8) {
+                        return result;
+                    } else {
+                        console.log('Address found outside Philadelphia area bounds');
+                        return null;
+                    }
+                }
+                
+                return null;
+            } catch (error) {
+                console.error('Geocoding error:', error);
+                return null;
+            }
+        }
+
+        // Add marker for user's searched location
+        function addUserLocationMarker(coordinates) {
+            // Remove existing user location marker
+            if (userLocationMarker) {
+                userLocationMarker.remove();
+            }
+
+            // Create user location marker with custom color
+            userLocationMarker = new maplibregl.Marker({
+                color: '#e91e63' // Purple color
+            })
+                .setLngLat([coordinates.lng, coordinates.lat])
+                .addTo(map);
+
+            // Add popup to user marker
+            const popup = new maplibregl.Popup({ offset: 25 })
+                .setHTML(`
+                    <div style="padding: 4px;">
+                        <h3 style="margin: 0 0 5px 0; color: #2c3e50;">📍 Your Location</h3>
+                    </div>
+                `);
+
+            userLocationMarker.setPopup(popup);
+        }
+
+        // Show nearby congregations sorted by distance
+        function showNearbyConggregations(userCoords) {
+            if (!filteredData || filteredData.length === 0) {
+                showError('No congregation data available');
+                return;
+            }
+
+            // Calculate distances and sort
+            const congregationsWithDistance = filteredData.map(congregation => {
+                const congLat = parseFloat(congregation._geolocation[0]);
+                const congLng = parseFloat(congregation._geolocation[1]);
+                const distance = calculateDistance(userCoords.lat, userCoords.lng, congLat, congLng);
+                
+                return {
+                    ...congregation,
+                    distance: distance
+                };
+            }).sort((a, b) => a.distance - b.distance);
+
+            // Display the list
+            displayCongregationList(congregationsWithDistance);
+        }
+
+        // Display congregation list in sidebar
+        function displayCongregationList(congregations) {
+            const listContainer = document.getElementById('listingsContainer');
+            const congregationListDiv = document.getElementById('congregationList');
+            
+            listContainer.innerHTML = '';
+            
+            congregations.forEach((congregation, index) => {
+                const listItem = document.createElement('div');
+                listItem.className = 'congregation-item';
+                listItem.id = `congregation-${congregation._id}`;
+                
+                const name = toSentenceCase(congregation.cong_name || 'Unknown Congregation');
+                const distance = congregation.distance.toFixed(1);
+                const resources = congregation['group_res/Resources'] ? 
+                    congregation['group_res/Resources'].split(' ').map(r => 
+                        `<span class="resource-tag">${r}</span>`
+                    ).join('') : '';
+                
+                listItem.innerHTML = `
+                    <div class="congregation-name">${name}</div>
+                    <div class="congregation-distance">${distance} miles away</div>
+                    <div class="congregation-address">${congregation.address || 'Address not available'}</div>
+                    ${resources ? `<div class="congregation-resources">${resources}</div>` : ''}
+                `;
+                
+                // Add click event to fly to congregation and show popup
+                listItem.addEventListener('click', () => {
+                    // Remove active class from all items
+                    document.querySelectorAll('.congregation-item').forEach(item => {
+                        item.classList.remove('active');
+                    });
+                    
+                    // Add active class to clicked item
+                    listItem.classList.add('active');
+                    
+                    // Fly to congregation
+                    const congLat = parseFloat(congregation._geolocation[0]);
+                    const congLng = parseFloat(congregation._geolocation[1]);
+                    
+                    map.flyTo({
+                        center: [congLng, congLat],
+                        zoom: 15
+                    });
+                    
+                    // Trigger click on the map marker to show popup
+                    setTimeout(() => {
+                        map.fire('click', {
+                            lngLat: { lng: congLng, lat: congLat },
+                            point: map.project([congLng, congLat]),
+                            originalEvent: {}
+                        });
+                    }, 500);
+                });
+                
+                listContainer.appendChild(listItem);
+            });
+            
+            congregationListDiv.style.display = 'block';
+        }
+
+        // Load data from static JSON file
+        async function loadData() {
+            try {
+                showLoading('Loading data...');
+                
+                // Fetch data from static JSON file
+                const response = await fetch('./data.json');
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to load data: ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                // Handle both direct array and nested results structure
+                originalData = data.results || data || [];
+                
+                console.log('Loaded data:', originalData.length, 'records');
+                
+                processData();
+                setupDynamicFilters();
+                updateMap();
+                
+                showSuccess(`${originalData.length} records loaded`);
+                
+            } catch (error) {
+                console.error('Error loading data:', error);
+                showError(`Error loading data: ${error.message}`);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // Process the data
+        function processData() {
+            console.log('Processing data...');
+            
+            if (originalData.length > 0) {
+                console.log('Available fields:', Object.keys(originalData[0]));
+                console.log('Sample record:', originalData[0]);
+            }
+
+            // Filter records that have geolocation data
+            filteredData = originalData.filter(row => {
+                if (!row._geolocation || !Array.isArray(row._geolocation) || row._geolocation.length < 2) {
+                    return false;
+                }
+                
+                const lat = parseFloat(row._geolocation[0]);
+                const lng = parseFloat(row._geolocation[1]);
+                
+                return !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0;
+            });
+            
+            console.log(`Filtered data: ${originalData.length} -> ${filteredData.length} records with valid coordinates`);
+            updateStats();
+        }
+
+        // Setup dynamic filters with toggle switches
+        function setupDynamicFilters() {
+            if (!originalData || originalData.length === 0) return;
+
+            const filtersContainer = document.getElementById('dynamicFilters');
+            filtersContainer.innerHTML = '';
+            
+            // Define custom order for filter values
+            const filterConfig = {
+                'lang': {
+                    label: 'By Language',
+                    icon: '🗣️',
+                    order: ['english', 'spanish', 'creole', 'french', 'other']
+                },
+                'group_res/Resources': {
+                    label: 'By Resources', 
+                    icon: '📋',
+                    order: ['food', 'clothing', 'home_articles', 'other']
+                }
+            };
+            
+            // Check which fields exist in the data
+            const availableFields = {};
+            Object.keys(filterConfig).forEach(field => {
+                if (originalData[0].hasOwnProperty(field)) {
+                    availableFields[field] = filterConfig[field];
+                }
+            });
+            
+            console.log('Available filter fields:', Object.keys(availableFields));
+            
+            // Create filter controls for each available field
+            Object.entries(availableFields).forEach(([field, config]) => {
+                // Get unique values for this field (space-separated)
+                const allValues = originalData
+                    .map(item => item[field])
+                    .filter(v => v && v !== '' && typeof v === 'string')
+                    .map(v => v.split(' ').map(s => s.trim()).filter(s => s !== ''))
+                    .flat();
+                
+                const uniqueValues = [...new Set(allValues)];
+                
+                if (uniqueValues.length === 0) {
+                    console.log(`No values found for field: ${field}`);
+                    return;
+                }
+                
+                // Sort values according to specified order
+                const orderedValues = [];
+                
+                // First, add values in the specified order if they exist
+                config.order.forEach(orderedValue => {
+                    const foundValue = uniqueValues.find(value => 
+                        value.toLowerCase() === orderedValue.toLowerCase()
+                    );
+                    if (foundValue) {
+                        orderedValues.push(foundValue);
+                    }
+                });
+                
+                // Then add any remaining values that weren't in the order specification
+                uniqueValues.forEach(value => {
+                    if (!orderedValues.some(orderedValue => 
+                        orderedValue.toLowerCase() === value.toLowerCase())) {
+                        orderedValues.push(value);
+                    }
+                });
+                
+                console.log(`Creating filter for ${field} with ordered values:`, orderedValues);
+                
+                // Create the filter section
+                const filterDiv = document.createElement('div');
+                filterDiv.className = 'filter-section';
+                
+                const label = document.createElement('h3');
+                label.textContent = `${config.icon} ${config.label}`;
+                filterDiv.appendChild(label);
+                
+                const switchContainer = document.createElement('div');
+                switchContainer.className = 'filter-switches';
+                
+                // Create toggle switches in the specified order
+                orderedValues.forEach(value => {
+                    const switchItem = document.createElement('div');
+                    switchItem.className = 'filter-switch-item';
+                    
+                    const switchLabel = document.createElement('label');
+                    switchLabel.className = 'filter-switch-label';
+                    switchLabel.textContent = value;
+                    
+                    const switchWrapper = document.createElement('label');
+                    switchWrapper.className = 'switch';
+                    
+                    const switchInput = document.createElement('input');
+                    switchInput.type = 'checkbox';
+                    switchInput.setAttribute('data-field', field);
+                    switchInput.setAttribute('data-value', value);
+                    switchInput.addEventListener('change', toggleSwitch);
+                    
+                    const slider = document.createElement('span');
+                    slider.className = 'slider';
+                    
+                    switchWrapper.appendChild(switchInput);
+                    switchWrapper.appendChild(slider);
+                    
+                    switchItem.appendChild(switchLabel);
+                    switchItem.appendChild(switchWrapper);
+                    
+                    switchContainer.appendChild(switchItem);
+                });
+                
+                filterDiv.appendChild(switchContainer);
+                filtersContainer.appendChild(filterDiv);
+            });
+            
+            // Add Reset All Filters button
+            if (Object.keys(availableFields).length > 0) {
+                const resetButton = document.createElement('button');
+                resetButton.className = 'reset-filters-btn';
+                resetButton.textContent = '🔄 Clear All';
+                resetButton.addEventListener('click', resetAllFilters);
+                filtersContainer.appendChild(resetButton);
+                
+                document.getElementById('filtersSection').style.display = 'block';
+            } else {
+                console.log('No target fields found. Available fields:', Object.keys(originalData[0]));
+            }
+        }
+
+        // Toggle switch state
+        function toggleSwitch(event) {
+            const clickedSwitch = event.target;
+            const field = clickedSwitch.getAttribute('data-field');
+            
+            // If the switch was just turned ON, turn off all other switches in the same category
+            if (clickedSwitch.checked) {
+                const allSwitchesInCategory = document.querySelectorAll(`#dynamicFilters input[data-field="${field}"]`);
+                allSwitchesInCategory.forEach(switchInput => {
+                    if (switchInput !== clickedSwitch) {
+                        switchInput.checked = false;
+                    }
+                });
+            }
+            
+            applyFilters();
+        }
+
+        // Reset all filters
+        function resetAllFilters() {
+            // Turn off all switches
+            const allSwitches = document.querySelectorAll('#dynamicFilters input[type="checkbox"]');
+            allSwitches.forEach(switchInput => {
+                switchInput.checked = false;
+            });
+            
+            // Apply filters (which will show all data since no filters are active)
+            applyFilters();
+            
+            console.log('All filters reset');
+        }
+
+        // Apply filters
+        function applyFilters() {
+            const activeSwitches = document.querySelectorAll('#dynamicFilters input[type="checkbox"]:checked');
+            const activeFilters = {};
+            
+            activeSwitches.forEach(switchInput => {
+                const field = switchInput.getAttribute('data-field');
+                const value = switchInput.getAttribute('data-value');
+                
+                if (!activeFilters[field]) {
+                    activeFilters[field] = [];
+                }
+                activeFilters[field].push(value);
+            });
+            
+            console.log('Applying filters:', activeFilters);
+            
+            filteredData = originalData.filter(row => {
+                // Must have valid geolocation
+                if (!row._geolocation || !Array.isArray(row._geolocation) || row._geolocation.length < 2) {
+                    return false;
+                }
+                
+                const lat = parseFloat(row._geolocation[0]);
+                const lng = parseFloat(row._geolocation[1]);
+                
+                if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) {
+                    return false;
+                }
+                
+                // Check active filters
+                for (const [field, filterValues] of Object.entries(activeFilters)) {
+                    const fieldValue = row[field];
+                    if (!fieldValue || typeof fieldValue !== 'string') return false;
+                    
+                    // Handle space-separated values
+                    const fieldItems = fieldValue.split(' ').map(s => s.trim()).filter(s => s !== '');
+                    
+                    // Check if any of the filter values match any of the field items
+                    const matchFound = filterValues.some(filterValue => 
+                        fieldItems.some(item => item.toLowerCase() === filterValue.toLowerCase())
+                    );
+                    
+                    if (!matchFound) return false;
+                }
+                
+                return true;
+            });
+            
+            updateMap();
+            updateStats();
+        }
+
+        // Update map using geolocation data
+        async function updateMap() {
+            // Remove existing layers
+            if (map.getLayer('data-points')) {
+                map.removeLayer('data-points');
+            }
+            if (map.getSource('data-points')) {
+                map.removeSource('data-points');
+            }
+
+            if (filteredData.length === 0) {
+                console.log('No data to display on map');
+                return;
+            }
+
+            console.log(`Displaying ${filteredData.length} points on map`);
+            
+            // Create features from geolocation data
+            const features = filteredData.map(row => {
+                const lat = parseFloat(row._geolocation[0]);
+                const lng = parseFloat(row._geolocation[1]);
+                
+                return {
+                    type: 'Feature',
+                    geometry: {
+                        type: 'Point',
+                        coordinates: [lng, lat] // GeoJSON uses [lng, lat] format
+                    },
+                    properties: {
+                        ...row
+                    }
+                };
+            });
+
+            // Add to map
+            const geojson = {
+                type: 'FeatureCollection',
+                features: features
+            };
+
+            map.addSource('data-points', {
+                type: 'geojson',
+                data: geojson
+            });
+
+            map.addLayer({
+                id: 'data-points',
+                type: 'circle',
+                source: 'data-points',
+                paint: {
+                    'circle-radius': 8,
+                    'circle-color': '#3498db',
+                    'circle-stroke-width': 2,
+                    'circle-stroke-color': '#ffffff'
+                }
+            });
+
+            // Fit to bounds
+            if (features.length > 0) {
+                const bounds = new maplibregl.LngLatBounds();
+                features.forEach(feature => {
+                    bounds.extend(feature.geometry.coordinates);
+                });
+                if (isInitialLoad) {
+                    // Don't auto-zoom on initial load, keep default zoom
+                    isInitialLoad = false;
+                } else {
+                    // Only auto-zoom when filters are applied
+                    map.fitBounds(bounds, { padding: 50, maxZoom: 15 });
+                }
+            }
+            
+            console.log(`Successfully added ${features.length} points to map`);
+        }
+
+        // Setup map interactions
+        function setupMapInteractions() {
+            map.on('click', 'data-points', (e) => {
+                const feature = e.features[0];
+                const properties = feature.properties;
+
+                let popupContent = '<div class="popup-content">';
+                
+                // Congregation name - convert to sentence case
+                const congName = toSentenceCase(properties.cong_name) || toSentenceCase(properties.name) || 'Unknown Congregation';
+                popupContent += `<h3>${congName}</h3>`;
+                
+                // Address
+                if (properties.address) {
+                    popupContent += `<p><strong>📍 Address:</strong> ${properties.address}</p>`;
+                }
+                
+                // Phone
+                if (properties.phone) {
+                    popupContent += `<p><strong>📞 Phone:</strong> ${properties.phone}</p>`;
+                }
+                
+                // Languages
+                if (properties.lang && properties.lang !== '') {
+                    const languages = properties.lang.split(' ').filter(lang => lang.trim() !== '').map(lang => 
+                        `<span class="language-tag">${lang.trim()}</span>`
+                    ).join(' '); // Add space between language tags
+                    popupContent += `<p><strong>🗣️ Languages:</strong><br>${languages}</p>`;
+                }
+                
+                // Available Resources with buttons
+                if (properties['group_res/Resources'] && properties['group_res/Resources'] !== '') {
+                    const resources = properties['group_res/Resources'].split(' ').filter(res => res.trim() !== '');
+                    
+                    popupContent += `<p><strong>📋 Available Resources:</strong></p>`;
+                    popupContent += `<div class="resources-container">`;
+                    
+                    resources.forEach(resource => {
+                        const resourceId = `resource-${Math.random().toString(36).substr(2, 9)}`;
+                        popupContent += `<button class="service-tag" onclick="toggleResourceDetails('${resourceId}', '${resource}', this)" data-resource="${resource}">${resource}</button>`;
+                        popupContent += `<div id="${resourceId}" class="service-details"></div>`;
+                    });
+                    
+                    popupContent += `</div>`;
+                }
+                
+                popupContent += '</div>';
+
+                const popup = new maplibregl.Popup({
+                    maxWidth: '350px'
+                })
+                    .setLngLat(feature.geometry.coordinates)
+                    .setHTML(popupContent)
+                    .addTo(map);
+
+                // Store the feature properties for use in the resource details function
+                window.currentFeatureProperties = properties;
+            });
+
+            map.on('mouseenter', 'data-points', () => {
+                map.getCanvas().style.cursor = 'pointer';
+            });
+
+            map.on('mouseleave', 'data-points', () => {
+                map.getCanvas().style.cursor = '';
+            });
+        }
+
+        // Function to toggle resource details
+        window.toggleResourceDetails = function(detailsId, resourceName, buttonElement) {
+            const detailsDiv = document.getElementById(detailsId);
+            const isActive = buttonElement.classList.contains('active');
+            
+            // Close all other resource details
+            document.querySelectorAll('.service-tag').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.querySelectorAll('.service-details').forEach(div => {
+                div.classList.remove('active');
+            });
+            
+            if (!isActive) {
+                // Open this resource detail
+                buttonElement.classList.add('active');
+                detailsDiv.classList.add('active');
+                
+                // Get resource details from the stored properties
+                const resourceDetails = getResourceDetails(window.currentFeatureProperties, resourceName);
+                detailsDiv.innerHTML = resourceDetails;
+            }
+        };
+
+        // Function to get resource details based on resource type
+        function getResourceDetails(properties, resourceName) {
+            console.log('Getting details for resource:', resourceName);
+            console.log('Available properties:', Object.keys(properties));
+            
+            let details = `<h4>${resourceName} Service Details</h4><div class="service-info">`;
+            
+            // Map resource names to their corresponding field paths (now handling arrays)
+            const resourceFieldMap = {
+                'food': {
+                    arrayPath: 'group_schgen/group_foodsch/group_aw4ip21_row',
+                    fields: {
+                        type: 'group_schgen/group_foodsch/group_aw4ip21_row/group_aw4ip21_row_type',
+                        season: 'group_schgen/group_foodsch/group_aw4ip21_row/group_aw4ip21_row_seas',
+                        days: 'group_schgen/group_foodsch/group_aw4ip21_row/group_aw4ip21_row_days',
+                        hours: 'group_schgen/group_foodsch/group_aw4ip21_row/group_aw4ip21_row_hou',
+                        notes: 'group_schgen/group_foodsch/group_aw4ip21_row/group_aw4ip21_row_notes'
+                    },
+                    fallbackFields: {
+                        type: 'group_res/Type_of_food',
+                        other: 'group_res/Other_food'
+                    }
+                },
+                'clothing': {
+                    arrayPath: 'group_schgen/group_clothsch/group_aw4ip22_row',
+                    fields: {
+                        type: 'group_schgen/group_clothsch/group_aw4ip22_row/group_aw4ip22_row_type',
+                        season: 'group_schgen/group_clothsch/group_aw4ip22_row/group_aw4ip22_row_seas',
+                        days: 'group_schgen/group_clothsch/group_aw4ip22_row/group_aw4ip22_row_days',
+                        hours: 'group_schgen/group_clothsch/group_aw4ip22_row/group_aw4ip22_row_hou',
+                        notes: 'group_schgen/group_clothsch/group_aw4ip22_row/group_aw4ip22_row_notes'
+                    },
+                    fallbackFields: {
+                        type: 'group_res/Type_of_clothing'
+                    }
+                },
+                'housing': {
+                    arrayPath: 'group_schgen/group_homesch/group_aw4ip24_row',
+                    fields: {
+                        type: 'group_schgen/group_homesch/group_aw4ip24_row/group_aw4ip24_row_type',
+                        season: 'group_schgen/group_homesch/group_aw4ip24_row/group_aw4ip24_row_seas',
+                        days: 'group_schgen/group_homesch/group_aw4ip24_row/group_aw4ip24_row_days',
+                        hours: 'group_schgen/group_homesch/group_aw4ip24_row/group_aw4ip24_row_hou',
+                        notes: 'group_schgen/group_homesch/group_aw4ip24_row/group_aw4ip24_row_notes'
+                    }
+                },
+                'home': {
+                    arrayPath: 'group_schgen/group_homesch/group_aw4ip24_row',
+                    fields: {
+                        type: 'group_schgen/group_homesch/group_aw4ip24_row/group_aw4ip24_row_type',
+                        season: 'group_schgen/group_homesch/group_aw4ip24_row/group_aw4ip24_row_seas',
+                        days: 'group_schgen/group_homesch/group_aw4ip24_row/group_aw4ip24_row_days',
+                        hours: 'group_schgen/group_homesch/group_aw4ip24_row/group_aw4ip24_row_hou',
+                        notes: 'group_schgen/group_homesch/group_aw4ip24_row/group_aw4ip24_row_notes'
+                    }
+                },
+                'home_articles': {
+                    arrayPath: 'group_schgen/group_homesch/group_aw4ip24_row',
+                    fields: {
+                        type: 'group_schgen/group_homesch/group_aw4ip24_row/group_aw4ip24_row_type',
+                        season: 'group_schgen/group_homesch/group_aw4ip24_row/group_aw4ip24_row_seas',
+                        days: 'group_schgen/group_homesch/group_aw4ip24_row/group_aw4ip24_row_days',
+                        hours: 'group_schgen/group_homesch/group_aw4ip24_row/group_aw4ip24_row_hou',
+                        notes: 'group_schgen/group_homesch/group_aw4ip24_row/group_aw4ip24_row_notes'
+                    },
+                    fallbackFields: {
+                        type: 'group_res/Type_of_article'
+                    }
+                },
+                'other': {
+                    // For "other" services, we'll search broadly
+                    arrayPath: null,
+                    fields: {},
+                    fallbackFields: {}
+                }
+            };
+            
+            // Get the field mapping for this resource (case-insensitive)
+            let resourceKey = Object.keys(resourceFieldMap).find(key => 
+                key.toLowerCase() === resourceName.toLowerCase()
+            );
+            
+            console.log('Resource key found:', resourceKey);
+            
+            if (resourceKey && resourceFieldMap[resourceKey]) {
+                const config = resourceFieldMap[resourceKey];
+                let hasDetails = false;
+                
+                console.log('Config for', resourceKey, ':', config);
+                
+                // Try to get data from the array first
+                if (config.arrayPath) {
+                    let dataArray = properties[config.arrayPath];
+                    console.log('Raw array data for', config.arrayPath, ':', dataArray);
+                    console.log('Data type:', typeof dataArray);
+                    
+                    // Check if it's a JSON string that needs parsing
+                    if (typeof dataArray === 'string') {
+                        try {
+                            dataArray = JSON.parse(dataArray);
+                            console.log('Parsed JSON string to array:', dataArray);
+                        } catch (e) {
+                            console.log('Failed to parse as JSON:', e);
+                            dataArray = null;
+                        }
+                    }
+                    
+                    console.log('Array check - isArray:', Array.isArray(dataArray), 'length:', dataArray ? dataArray.length : 'N/A');
+                    
+                    if (dataArray && Array.isArray(dataArray) && dataArray.length > 0) {
+                        // Get the first element of the array
+                        const serviceData = dataArray[0];
+                        console.log('Service data found:', serviceData);
+                        console.log('Available fields in service data:', Object.keys(serviceData));
+                        
+                        // Process each field in the service data
+                        Object.keys(serviceData).forEach(key => {
+                            const value = serviceData[key];
+                            console.log(`Processing field: ${key} = ${value}`);
+                            
+                            if (value && value !== '') {
+                                if (key.includes('_type')) {
+                                    details += `<strong>Type:</strong> ${value.replace(/_/g, ' ')}<br>`;
+                                    hasDetails = true;
+                                    console.log('✓ Added type:', value);
+                                } else if (key.includes('_seas')) {
+                                    details += `<strong>Season:</strong> ${value}<br>`;
+                                    hasDetails = true;
+                                    console.log('✓ Added season:', value);
+                                } else if (key.includes('_days')) {
+                                    let days = value;
+                                    // Expand common abbreviations
+                                    days = days.replace(/\bmon\b/gi, 'Monday')
+                                              .replace(/\btue\b/gi, 'Tuesday')
+                                              .replace(/\bwed\b/gi, 'Wednesday')
+                                              .replace(/\bthu\b/gi, 'Thursday')
+                                              .replace(/\bfri\b/gi, 'Friday')
+                                              .replace(/\bsat\b/gi, 'Saturday')
+                                              .replace(/\bsun\b/gi, 'Sunday');
+                                    details += `<strong>Days:</strong> ${days}<br>`;
+                                    hasDetails = true;
+                                    console.log('✓ Added days:', days);
+                                } else if (key.includes('_hou')) {
+                                    let hours = value;
+                                    // Format hours nicely if they're space-separated
+                                    if (hours.includes(' ') && !hours.includes('-') && !hours.includes('to')) {
+                                        const hoursList = hours.split(' ').filter(h => h.trim());
+                                        if (hoursList.length > 1) {
+                                            hours = `${hoursList[0]} - ${hoursList[hoursList.length - 1]}`;
+                                        }
+                                    }
+                                    details += `<strong>Hours:</strong> ${hours}<br>`;
+                                    hasDetails = true;
+                                    console.log('✓ Added hours:', hours);
+                                } else if (key.includes('_notes')) {
+                                    details += `<strong>Notes:</strong> ${value}<br>`;
+                                    hasDetails = true;
+                                    console.log('✓ Added notes:', value);
+                                }
+                            }
+                        });
+                        
+                        console.log('HasDetails after processing array:', hasDetails);
+                    } else {
+                        console.log('Array validation failed:');
+                        console.log('- dataArray exists:', !!dataArray);
+                        console.log('- is Array:', Array.isArray(dataArray));
+                        console.log('- length > 0:', dataArray && dataArray.length > 0);
+                        console.log('No valid array data found');
+                    }
+                }
+                
+                // Only try fallback if we haven't found details yet
+                if (!hasDetails && config.fallbackFields) {
+                    console.log('Trying fallback fields:', config.fallbackFields);
+                    
+                    for (const [label, fieldPath] of Object.entries(config.fallbackFields)) {
+                        if (properties[fieldPath]) {
+                            const displayLabel = label.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                            details += `<strong>${displayLabel}:</strong> ${properties[fieldPath].replace(/_/g, ' ')}<br>`;
+                            hasDetails = true;
+                            console.log('✓ Added fallback:', label, '=', properties[fieldPath]);
+                        }
+                    }
+                }
+                
+                // If still no details and this is "other", search more broadly
+                if (!hasDetails && resourceName.toLowerCase() === 'other') {
+                    console.log('Searching for other service details...');
+                    
+                    // Look for general notes
+                    if (properties['group_yd9mm37/general_notes']) {
+                        details += `<strong>Notes:</strong> ${properties['group_yd9mm37/general_notes']}<br>`;
+                        hasDetails = true;
+                    }
+                    
+                    // Look for any "other" type fields
+                    for (const [key, value] of Object.entries(properties)) {
+                        if (key.toLowerCase().includes('other') && 
+                            value && value !== '' && 
+                            typeof value === 'string' &&
+                            !key.includes('group_yd9mm37')) { // Avoid duplicate general notes
+                            const displayKey = key.split('/').pop().replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                            details += `<strong>${displayKey}:</strong> ${value}<br>`;
+                            hasDetails = true;
+                        }
+                    }
+                }
+                
+                // If no specific details found, show a generic message
+                if (!hasDetails) {
+                    details += `Service available. Contact congregation for details.`;
+                }
+            } else {
+                console.log('No specific mapping found for:', resourceName);
+                // Generic search for any related fields
+                let foundDetails = false;
+                
+                for (const [key, value] of Object.entries(properties)) {
+                    if (key.toLowerCase().includes(resourceName.toLowerCase()) && 
+                        value && value !== '' && 
+                        typeof value === 'string') {
+                        const displayKey = key.split('/').pop().replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                        details += `<strong>${displayKey}:</strong> ${value}<br>`;
+                        foundDetails = true;
+                    }
+                }
+                
+                if (!foundDetails) {
+                    details += `Service available. Contact congregation for detailed information.`;
+                }
+            }
+            
+            details += '</div>';
+            console.log('Final details:', details);
+            return details;
+        }
+
+        // Update statistics
+        function updateStats() {
+            document.getElementById('recordCount').textContent = filteredData.length;
+        }
+
+        // Utility functions
+        function showLoading(message) {
+            const loadingEl = document.getElementById('loading');
+            loadingEl.textContent = message;
+            loadingEl.style.display = 'block';
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        function showSuccess(message) {
+            const successDiv = document.createElement('div');
+            successDiv.className = 'success-message';
+            successDiv.textContent = message;
+            
+            // Try to add to right sidebar first, fallback to main sidebar
+            const rightErrorContainer = document.getElementById('rightErrorMessages');
+            
+            if (rightErrorContainer) {
+                rightErrorContainer.appendChild(successDiv);
+            }
+            
+            setTimeout(() => {
+                successDiv.remove();
+            }, 5000);
+        }
+
+        function showError(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            errorDiv.textContent = message;
+            
+            // Try to add to right sidebar first, fallback to main sidebar
+            const rightErrorContainer = document.getElementById('rightErrorMessages');
+            
+            if (rightErrorContainer) {
+                rightErrorContainer.appendChild(errorDiv);
+            }
+            
+            setTimeout(() => {
+                errorDiv.remove();
+            }, 8000);
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            initMap();
+            // Data loading is now automatic when map loads
+        });
+    </script>
+</body>
+</html>
